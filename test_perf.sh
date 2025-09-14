@@ -1,8 +1,22 @@
 CPUn=(cpu cpu0 cpu1 cpu2 cpu3)
 
-outputFile=$1
+outputFile=${!#}
 useTop=false
 delay=30
+
+csv3first () {
+    i=0
+    line=$1
+    for value in $line; do
+        if [[ $i -lt 3 ]]; then
+            echo -n "$value;" >> $outputFile
+            i=$i+1
+        else
+            echo -n "$value" >> $outputFile
+        fi
+    done
+    echo -n ";" >> $outputFile
+}
 
 oneLineNoTop () {
     #Check time
@@ -21,6 +35,21 @@ oneLineNoTop () {
     #meminfo=`cat /proc/meminfo` 
     cat /proc/meminfo | grep -Eo "[0-9]+" | while read line;do
         echo -n "${line};" >> $outputFile
+
+    #Check CPU process
+    if [[ $addCpuProcess -gt 0 ]]; then
+        ps axo pcpu,pid,time,cmd --sort=-pcpu | head -$[$addCpuProcess+1] | tail -$addCpuProcess | while read line; do
+            csv3first "$line"
+        done
+    fi
+
+    #Check Mem process
+    if [[ $addMemProcess -gt 0 ]]; then
+        ps axo pmem,pid,time,cmd --sort=-pmem | head -$[$addCpuProcess+1] | tail -$addCpuProcess | while read line; do
+            csv3first "$line"
+        done
+    fi
+
     done
 }
 
@@ -60,15 +89,39 @@ LoopTop () {
 
 
 #check if using arguments or not
+addMemProcess=0
+addCpuProcess=0
+needMemProcess=false
+needCpuProcess=false
 if [[ $# -gt 1 ]]; then
     for args in "$@"; do
+        needCleaning=true
         case $args in
+            -c)
+                needCpuProcess=true
+                needCleaning=false
+                ;;
+            -m)
+                needMemProcess=true
+                needCleaning=false
+                ;;
             -t)
                 useTop=true
+                ;;
+            [0-9]*)
+                if $needCpuProcess; then
+                    addCpuProcess=$args
+                elif $needMemProcess; then
+                    addMemProcess=$args
+                fi
                 ;;
             *)
                 ;;
         esac
+        if $needCleaning; then
+            needMemProcess=false
+            needCpuProcess=false
+        fi
     done
 fi
 
