@@ -8,6 +8,7 @@ needCompressing=false
 tarCompressing=false
 zipCompressing=false
 tgzCompressing=false
+continuous=false
 
 if [[ $# -gt 1 ]]; then
     for args in "$@"; do
@@ -28,14 +29,39 @@ if [[ $# -gt 1 ]]; then
                 needCompressing=true
                 tgzCompressing=true
                 ;;
+            -C)
+                continuous=true
+                ;;
             *)
                 ;;
         esac
     done
 fi
 
+if ${continuous};then
+    if [ -f ./.continuous_extractLogs ];then
+        extractTime="--since=$(cat ./.continuous_extractLogs)"
+    else
+        extractTime=""
+    fi
+else
+    extractTime="-b 0"
+fi
+
+
+if [ -f ./.continuous_extractLogs ];then
+    rm -f ./.continuous_extractLogs
+fi
+
 extractName=${!#}
-extractTime="-b 0"
+
+if ${continuous};then
+    until=$(date '+%Y-%m-%dT%H:%M:%S')
+    echo "$until" > ./.continuous_extractLogs
+    extractTime="${extractTime}  --until=${until}"
+    extractName="${extractName}_$(date -d ${until} "+%s")"
+    sleep 1
+fi
 
 journalctl --list-boot > ${extractName}_extractInfo
 
